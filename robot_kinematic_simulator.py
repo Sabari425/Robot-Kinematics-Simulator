@@ -18,7 +18,7 @@ from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 
 """
-Professional Robot Kinematics Simulator
+Robot Kinematics Simulator
 - Complete DH parameter-based forward kinematics
 - Advanced 3D visualization with clear labeling
 - Real-time joint control and analysis
@@ -1226,7 +1226,6 @@ class DHManipulatorGUI(QWidget):
         self.status_label.setText("All results cleared")
 
     def on_plot_hover(self, event):
-        # Optional: Add tooltip or coordinate display on hover
         if event.inaxes == self.ax:
             pass  # Could implement coordinate display
 
@@ -1234,11 +1233,11 @@ class DHManipulatorGUI(QWidget):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
 
-    # Set application-wide font
     font = QFont("Segoe UI", 10)
     app.setFont(font)
 
     gui = DHManipulatorGUI()
     gui.show()
+
 
     sys.exit(app.exec())
