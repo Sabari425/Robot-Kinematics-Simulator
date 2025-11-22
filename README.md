@@ -7,7 +7,6 @@ A professional-grade Python application for robotic manipulator simulation and a
 ![PyQt6](https://img.shields.io/badge/GUI-PyQt6-green)
 ![Matplotlib](https://img.shields.io/badge/Visualization-Matplotlib-orange)
 ![Robotics](https://img.shields.io/badge/Field-Robotics-red)
-![License](https://img.shields.io/badge/License-MIT-lightgrey)
 
 ---
 
