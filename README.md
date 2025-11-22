@@ -2,6 +2,13 @@
 
 A professional-grade Python application for robotic manipulator simulation and analysis using Denavit–Hartenberg (DH) parameters. Includes real-time 3D visualization, interactive joint control, and complete kinematic analysis.
 
+
+![Python]([https://img.shields.io/badge/Python-3.8%2B-blue](https://www.python.org/downloads/))
+![PyQt6](https://img.shields.io/badge/GUI-PyQt6-green)
+![Matplotlib](https://img.shields.io/badge/Visualization-Matplotlib-orange)
+![Robotics](https://img.shields.io/badge/Field-Robotics-red)
+![License](https://img.shields.io/badge/License-MIT-lightgrey)
+
 ![Python](https://www.python.org/downloads/)
 ![PyQt6](https://www.pythonguis.com/pyqt6-tutorial/)
 ![Matplotlib](https://matplotlib.org/)
