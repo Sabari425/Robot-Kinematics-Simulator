@@ -10,22 +10,6 @@ A professional-grade Python application for robotic manipulator simulation and a
 
 ---
 
-## Table of Contents
-- [Features](#features)
-- [Quick Start](#quick-start)
-- [Installation](#installation)
-- [Usage Guide](#usage-guide)
-- [Mathematical Foundation](#mathematical-foundation)
-- [Code Structure](#code-structure)
-- [Troubleshooting](#troubleshooting)
-- [Future Enhancements](#future-enhancements)
-- [Contributing](#contributing)
-- [License](#license)
-- [Support](#support)
-- [Acknowledgments](#acknowledgments)
-
----
-
 ## Features
 
 ### Robot Modeling
