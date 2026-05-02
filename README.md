@@ -82,3 +82,9 @@ python -c "import numpy, sympy, PyQt6, matplotlib; print('All dependencies insta
 ```bash
 python robot_kinematic_simulator.py
 ```
+
+#### (or) for new version
+
+```bash
+python robot_kinematic_simulator_advanced.py
+```
