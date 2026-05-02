@@ -1,3 +1,4 @@
+# robot_arm_dh_gui.py
 import sys
 import numpy as np
 import math as m
@@ -16,6 +17,14 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 
+"""
+Professional Robot Kinematics Simulator
+- Complete DH parameter-based forward kinematics
+- Advanced 3D visualization with clear labeling
+- Real-time joint control and analysis
+- Professional interface design
+- DH Final Transformation Matrix analysis
+"""
 
 
 # =============================================================================
@@ -131,7 +140,32 @@ def dh_transform(theta_rad, d, a, alpha_rad):
     return T
 
 
-from kinematics_utils import compute_forward_kinematics, matrix_to_pretty_string, dh_transform
+def compute_forward_kinematics(dh_table):
+    """
+    dh_table: list of dicts [{theta_deg, d, a, alpha_deg, variable}, ...]
+    Returns: list of T matrices T0_1, T0_2, ..., T0_n and joint positions (n+1 x 3)
+    """
+    Ts = []
+    positions = [np.array([0.0, 0.0, 0.0])]
+    T_prev = np.eye(4)
+    for row in dh_table:
+        theta = np.radians(row['theta_deg'])
+        alpha = np.radians(row['alpha_deg'])
+        d = float(row['d'])
+        a = float(row['a'])
+        Ti = dh_transform(theta, d, a, alpha)
+        T_prev = T_prev @ Ti
+        Ts.append(T_prev.copy())
+        pos = T_prev[:3, 3].copy()
+        positions.append(pos)
+    return Ts, positions
+
+
+def matrix_to_pretty_string(M):
+    lines = []
+    for r in range(M.shape[0]):
+        lines.append("  ".join(f"{M[r, c]: .6f}" for c in range(M.shape[1])))
+    return "\n".join(lines)
 
 
 def analyze_final_transformation_matrix(T_final):
@@ -422,10 +456,7 @@ class DHManipulatorGUI(QWidget):
                 'd': 0.0,
                 'a': 1.0,
                 'alpha_deg': 0.0,
-                'variable': True,
-                'joint_type': 'revolute',
-                'theta_min': -180,
-                'theta_max': 180
+                'variable': True
             })
 
     def init_ui(self):
@@ -496,24 +527,12 @@ class DHManipulatorGUI(QWidget):
         table_layout.addWidget(table_instructions)
 
         self.table = QTableWidget()
-        self.table.setColumnCount(8)
-        self.table.setHorizontalHeaderLabels(["θ (deg)", "d", "a", "α (deg)", "Variable", "Joint Type", "Min", "Max"])
+        self.table.setColumnCount(5)
+        self.table.setHorizontalHeaderLabels(["θ (deg)", "d", "a", "α (deg)", "Variable"])
         header = self.table.horizontalHeader()
         header.setStretchLastSection(True)
-        # Increase row height and font size
-        self.table.verticalHeader().setDefaultSectionSize(40)
-        font = QFont()
-        font.setPointSize(11)
-        self.table.setFont(font)
-        # Set minimum width for each column
-        min_widths = [80, 60, 60, 80, 70, 100, 70, 70]
-        for i, width in enumerate(min_widths):
-            self.table.setColumnWidth(i, width)
-        # Make headers bold
-        header_font = QFont()
-        header_font.setPointSize(11)
-        header_font.setBold(True)
-        self.table.horizontalHeader().setFont(header_font)
+        for i in range(4):
+            header.setSectionResizeMode(i, QHeaderView.ResizeMode.Stretch)
         self.populate_table()
         table_layout.addWidget(self.table)
 
@@ -626,19 +645,6 @@ class DHManipulatorGUI(QWidget):
         self.ax = self.fig.add_subplot(111, projection='3d')
         self.ax.set_facecolor('#2b2b2b')
         self.ax.set_box_aspect([1, 1, 1])
-        # Center the plot and set equal aspect ratio
-        self.ax.set_position([0.1, 0.1, 0.8, 0.8])
-        self.ax.set_proj_type('ortho')
-        # Set initial view limits
-        self.ax.set_xlim([-2, 2])
-        self.ax.set_ylim([-2, 2])
-        self.ax.set_zlim([-2, 2])
-        # Add grid and make it more visible
-        self.ax.grid(True, linestyle='--', alpha=0.5)
-        # Make axis labels more visible
-        self.ax.set_xlabel('X', fontsize=12, labelpad=10)
-        self.ax.set_ylabel('Y', fontsize=12, labelpad=10)
-        self.ax.set_zlabel('Z', fontsize=12, labelpad=10)
         self.canvas.mpl_connect("motion_notify_event", self.on_plot_hover)
         plot_layout.addWidget(self.canvas)
 
@@ -738,98 +744,51 @@ class DHManipulatorGUI(QWidget):
             aalpha = QTableWidgetItem(f"{row['alpha_deg']:.3f}")
             var = QTableWidgetItem("1" if row.get('variable', False) else "0")
 
-            joint_type_combo = QComboBox()
-            joint_type_combo.addItems(['revolute', 'prismatic'])
-            joint_type_combo.setCurrentText(row.get('joint_type', 'revolute'))
-            joint_type_combo.currentTextChanged.connect(lambda text, row=i: self.on_joint_type_changed(text, row))
-
-            if row.get('joint_type', 'revolute') == 'revolute':
-                min_value = row.get('theta_min', -180)
-                max_value = row.get('theta_max', 180)
-            else:
-                min_value = row.get('d_min', -0.5)
-                max_value = row.get('d_max', 0.5)
-
-            min_item = QTableWidgetItem(str(min_value))
-            max_item = QTableWidgetItem(str(max_value))
-
             self.table.setItem(i, 0, titem)
             self.table.setItem(i, 1, ditem)
             self.table.setItem(i, 2, aitem)
             self.table.setItem(i, 3, aalpha)
             self.table.setItem(i, 4, var)
-            self.table.setCellWidget(i, 5, joint_type_combo)
-            self.table.setItem(i, 6, min_item)
-            self.table.setItem(i, 7, max_item)
-
-    def on_joint_type_changed(self, joint_type, row):
-        if joint_type == 'revolute':
-            min_value = -180
-            max_value = 180
-        else:  # prismatic
-            min_value = -0.5
-            max_value = 0.5
-        
-        self.table.item(row, 6).setText(str(min_value))
-        self.table.item(row, 7).setText(str(max_value))
-        self.on_update()
 
     def read_table(self):
         new_table = []
         for i in range(self.table.rowCount()):
             try:
                 theta = float(self.table.item(i, 0).text())
+            except:
+                theta = 0.0
+            try:
                 d = float(self.table.item(i, 1).text())
+            except:
+                d = 0.0
+            try:
                 a = float(self.table.item(i, 2).text())
+            except:
+                a = 0.0
+            try:
                 alpha = float(self.table.item(i, 3).text())
+            except:
+                alpha = 0.0
+            try:
                 var = int(float(self.table.item(i, 4).text())) != 0
-                joint_type = self.table.cellWidget(i, 5).currentText()
-                min_val = float(self.table.item(i, 6).text())
-                max_val = float(self.table.item(i, 7).text())
-                
-                params = {
-                    'theta_deg': theta,
-                    'd': d,
-                    'a': a,
-                    'alpha_deg': alpha,
-                    'variable': var,
-                    'joint_type': joint_type
-                }
-                
-                if joint_type == 'revolute':
-                    params.update({
-                        'theta_min': min_val,
-                        'theta_max': max_val
-                    })
-                else:  # prismatic
-                    params.update({
-                        'd_min': min_val,
-                        'd_max': max_val
-                    })
-                
-                new_table.append(params)
-            except (ValueError, AttributeError) as e:
-                print(f"Error reading table row {i}: {e}")
-                return False
+            except:
+                var = False
+            new_table.append({
+                'theta_deg': theta,
+                'd': d,
+                'a': a,
+                'alpha_deg': alpha,
+                'variable': var
+            })
 
         self.dh_table = new_table
-        return True
 
     def on_n_changed(self, val):
         n_old = len(self.dh_table)
         n_new = val
         if n_new > n_old:
             for _ in range(n_new - n_old):
-                self.dh_table.append({
-                    'theta_deg': 0.0,
-                    'd': 0.0,
-                    'a': 1.0,
-                    'alpha_deg': 0.0,
-                    'variable': True,
-                    'joint_type': 'revolute',
-                    'theta_min': -180,
-                    'theta_max': 180
-                })
+                self.dh_table.append({'theta_deg': 0.0, 'd': 0.0, 'a': 1.0, 'alpha_deg': 0.0, 'variable': True})
         elif n_new < n_old:
             self.dh_table = self.dh_table[:n_new]
         self.populate_table()
@@ -858,28 +817,15 @@ class DHManipulatorGUI(QWidget):
                 slider_layout = QHBoxLayout(slider_container)
                 slider_layout.setContentsMargins(0, 5, 0, 5)
 
-                # Set label and range based on joint type
-                if row['joint_type'] == 'revolute':
-                    label = QLabel(f"Joint {i + 1} (θ):")
-                    min_val = int(row.get('theta_min', -180))
-                    max_val = int(row.get('theta_max', 180))
-                    current_val = int(row['theta_deg'])
-                    suffix = '°'
-                else:  # prismatic
-                    label = QLabel(f"Joint {i + 1} (d):")
-                    min_val = int(row.get('d_min', -0.5) * 1000)
-                    max_val = int(row.get('d_max', 0.5) * 1000)
-                    current_val = int(row['d'] * 1000)
-                    suffix = 'mm'
-
+                label = QLabel(f"Joint {i + 1} (θ):")
                 label.setMinimumWidth(80)
                 slider_layout.addWidget(label)
 
                 slider = QSlider(Qt.Orientation.Horizontal)
-                slider.setRange(min_val, max_val)
-                slider.setValue(current_val)
+                slider.setRange(-180, 180)
+                slider.setValue(int(row['theta_deg']))
 
-                value_label = QLabel(f"{current_val:6.1f}{suffix}")
+                value_label = QLabel(f"{row['theta_deg']:6.1f}°")
                 value_label.setMinimumWidth(60)
                 value_label.setAlignment(Qt.AlignmentFlag.AlignRight)
                 slider.valueChanged.connect(self.make_slider_handler(i, value_label))
@@ -892,15 +838,9 @@ class DHManipulatorGUI(QWidget):
 
     def make_slider_handler(self, idx, label_widget):
         def handler(val):
-            if self.dh_table[idx]['joint_type'] == 'revolute':
-                self.dh_table[idx]['theta_deg'] = float(val)
-                label_widget.setText(f"{val:6.1f}°")
-                self.table.item(idx, 0).setText(f"{val:.3f}")
-            else:  # prismatic
-                d_value = val / 1000.0  # Convert from millimeters to meters
-                self.dh_table[idx]['d'] = d_value
-                label_widget.setText(f"{val:6.1f}mm")
-                self.table.item(idx, 1).setText(f"{d_value:.3f}")
+            self.dh_table[idx]['theta_deg'] = float(val)
+            label_widget.setText(f"{val:6.1f}°")
+            self.table.item(idx, 0).setText(f"{val:.3f}")
             self.on_update(plot_only=True)
 
         return handler
@@ -1118,42 +1058,30 @@ class DHManipulatorGUI(QWidget):
 
         if preset_name == "3-DOF Planar":
             self.dh_table = [
-                {'theta_deg': 45.0, 'd': 0.0, 'a': 1.0, 'alpha_deg': 0.0, 'variable': True, 'joint_type': 'revolute', 'theta_min': -180, 'theta_max': 180},
-                {'theta_deg': -30.0, 'd': 0.0, 'a': 1.0, 'alpha_deg': 0.0, 'variable': True, 'joint_type': 'revolute', 'theta_min': -180, 'theta_max': 180},
-                {'theta_deg': 15.0, 'd': 0.0, 'a': 0.8, 'alpha_deg': 0.0, 'variable': True, 'joint_type': 'revolute', 'theta_min': -180, 'theta_max': 180}
+                {'theta_deg': 45.0, 'd': 0.0, 'a': 1.0, 'alpha_deg': 0.0, 'variable': True},
+                {'theta_deg': -30.0, 'd': 0.0, 'a': 1.0, 'alpha_deg': 0.0, 'variable': True},
+                {'theta_deg': 15.0, 'd': 0.0, 'a': 0.8, 'alpha_deg': 0.0, 'variable': True}
             ]
         elif preset_name == "SCARA Robot":
             self.dh_table = [
-                {'theta_deg': 30.0, 'd': 0.3, 'a': 1.0, 'alpha_deg': 0.0, 'variable': True, 'joint_type': 'revolute', 'theta_min': -180, 'theta_max': 180},
-                {'theta_deg': -45.0, 'd': 0.0, 'a': 0.8, 'alpha_deg': 0.0, 'variable': True, 'joint_type': 'revolute', 'theta_min': -180, 'theta_max': 180},
-                {'theta_deg': 0.0, 'd': 0.0, 'a': 0.0, 'alpha_deg': 0.0, 'variable': True, 'joint_type': 'prismatic', 'd_min': -0.5, 'd_max': 0.0}
+                {'theta_deg': 30.0, 'd': 0.3, 'a': 1.0, 'alpha_deg': 0.0, 'variable': True},
+                {'theta_deg': -45.0, 'd': 0.0, 'a': 0.8, 'alpha_deg': 180.0, 'variable': True},
+                {'theta_deg': 0.0, 'd': -0.5, 'a': 0.0, 'alpha_deg': 0.0, 'variable': True}
             ]
         elif preset_name == "Articulated (RRR)":
             self.dh_table = [
-                {'theta_deg': 45.0, 'd': 0.2, 'a': 0.0, 'alpha_deg': 90.0, 'variable': True, 'joint_type': 'revolute', 'theta_min': -180, 'theta_max': 180},
-                {'theta_deg': -30.0, 'd': 0.0, 'a': 1.0, 'alpha_deg': 0.0, 'variable': True, 'joint_type': 'revolute', 'theta_min': -180, 'theta_max': 180},
-                {'theta_deg': 15.0, 'd': 0.0, 'a': 0.8, 'alpha_deg': 0.0, 'variable': True, 'joint_type': 'revolute', 'theta_min': -180, 'theta_max': 180}
-            ]
-        elif preset_name == "Cylindrical":
-            self.dh_table = [
-                {'theta_deg': 0.0, 'd': 0.3, 'a': 0.0, 'alpha_deg': 0.0, 'variable': True, 'joint_type': 'revolute', 'theta_min': -180, 'theta_max': 180},
-                {'theta_deg': 0.0, 'd': 0.0, 'a': 0.0, 'alpha_deg': 0.0, 'variable': True, 'joint_type': 'prismatic', 'd_min': 0.0, 'd_max': 0.5},
-                {'theta_deg': 0.0, 'd': 0.0, 'a': 0.0, 'alpha_deg': 0.0, 'variable': True, 'joint_type': 'prismatic', 'd_min': 0.0, 'd_max': 0.3}
-            ]
-        elif preset_name == "Spherical":
-            self.dh_table = [
-                {'theta_deg': 0.0, 'd': 0.0, 'a': 0.0, 'alpha_deg': 90.0, 'variable': True, 'joint_type': 'revolute', 'theta_min': -180, 'theta_max': 180},
-                {'theta_deg': 0.0, 'd': 0.0, 'a': 0.0, 'alpha_deg': 90.0, 'variable': True, 'joint_type': 'revolute', 'theta_min': -90, 'theta_max': 90},
-                {'theta_deg': 0.0, 'd': 0.0, 'a': 0.5, 'alpha_deg': 0.0, 'variable': True, 'joint_type': 'prismatic', 'd_min': 0.0, 'd_max': 0.5}
+                {'theta_deg': 45.0, 'd': 0.2, 'a': 0.0, 'alpha_deg': 90.0, 'variable': True},
+                {'theta_deg': -30.0, 'd': 0.0, 'a': 1.0, 'alpha_deg': 0.0, 'variable': True},
+                {'theta_deg': 15.0, 'd': 0.0, 'a': 0.8, 'alpha_deg': 0.0, 'variable': True}
             ]
         elif preset_name == "6-DOF Industrial":
             self.dh_table = [
-                {'theta_deg': 30.0, 'd': 0.3, 'a': 0.0, 'alpha_deg': 90.0, 'variable': True, 'joint_type': 'revolute', 'theta_min': -180, 'theta_max': 180},
-                {'theta_deg': -45.0, 'd': 0.0, 'a': 1.0, 'alpha_deg': 0.0, 'variable': True, 'joint_type': 'revolute', 'theta_min': -180, 'theta_max': 180},
-                {'theta_deg': 60.0, 'd': 0.0, 'a': 0.5, 'alpha_deg': 90.0, 'variable': True, 'joint_type': 'revolute', 'theta_min': -180, 'theta_max': 180},
-                {'theta_deg': -30.0, 'd': 0.4, 'a': 0.0, 'alpha_deg': -90.0, 'variable': True, 'joint_type': 'revolute', 'theta_min': -180, 'theta_max': 180},
-                {'theta_deg': 45.0, 'd': 0.0, 'a': 0.0, 'alpha_deg': 90.0, 'variable': True, 'joint_type': 'revolute', 'theta_min': -180, 'theta_max': 180},
-                {'theta_deg': 0.0, 'd': 0.1, 'a': 0.0, 'alpha_deg': 0.0, 'variable': True, 'joint_type': 'revolute', 'theta_min': -180, 'theta_max': 180}
+                {'theta_deg': 30.0, 'd': 0.3, 'a': 0.0, 'alpha_deg': 90.0, 'variable': True},
+                {'theta_deg': -45.0, 'd': 0.0, 'a': 1.0, 'alpha_deg': 0.0, 'variable': True},
+                {'theta_deg': 60.0, 'd': 0.0, 'a': 0.5, 'alpha_deg': 90.0, 'variable': True},
+                {'theta_deg': -30.0, 'd': 0.4, 'a': 0.0, 'alpha_deg': -90.0, 'variable': True},
+                {'theta_deg': 45.0, 'd': 0.0, 'a': 0.0, 'alpha_deg': 90.0, 'variable': True},
+                {'theta_deg': 0.0, 'd': 0.1, 'a': 0.0, 'alpha_deg': 0.0, 'variable': True}
             ]
 
         self.spin_n.setValue(len(self.dh_table))
